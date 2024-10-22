@@ -68,3 +68,40 @@ class GameLogic:
                         to_capture.append(neighbor)
 
         return list(captured)
+
+    def calculate_territory(self):
+        visited = set()
+        black_territory = 0
+        white_territory = 0
+
+        for row in range(self.size):
+            for col in range(self.size):
+                if (row, col) not in self.stones and (row, col) not in visited:
+                    territory, surrounding_colors = self.flood_fill_territory(row, col, visited)
+
+                    if surrounding_colors == {"black"}:
+                        black_territory += territory
+                    elif surrounding_colors == {"white"}:
+                        white_territory += territory
+
+        return black_territory, white_territory
+
+    def flood_fill_territory(self, row, col, visited):
+        to_fill = [(row, col)]
+        visited.add((row, col))
+        territory_size = 0
+        surrounding_colors = set()
+
+        while to_fill:
+            r, c = to_fill.pop()
+            territory_size += 1
+
+            for neighbor in self.get_neighbors(r, c):
+                if neighbor not in visited:
+                    if neighbor not in self.stones:
+                        visited.add(neighbor)
+                        to_fill.append(neighbor)
+                    else:
+                        surrounding_colors.add(self.stones[neighbor])
+
+        return territory_size, surrounding_colors

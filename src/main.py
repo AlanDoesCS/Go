@@ -15,6 +15,10 @@ class GoBoard:
         self.current_color = "black"  # black always starts
         self.bg_color = "#e0c69d"  # board color
         self.create_board()
+        self.last_player_passed = False
+        self.passed_twice = False
+        self.pass_button = tk.Button(window, text="Pass", command=self.pass_turn)
+        self.pass_button.pack()
 
         self.canvas.bind("<Button-1>", self.place_stone)  # left click
 
@@ -57,6 +61,10 @@ class GoBoard:
             self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill="black")
 
     def place_stone(self, event):
+        if self.passed_twice:
+            print("Game already over!")
+            return
+
         row = round((event.y - self.margin) / self.cell_size)
         col = round((event.x - self.margin) / self.cell_size)
 
@@ -67,6 +75,7 @@ class GoBoard:
                 if captured_stones:
                     self.remove_captured_stones(captured_stones)
                 self.current_color = "white" if self.current_color == "black" else "black"
+                self.last_player_passed = False
 
     def add_stone(self, row, col):
         x = self.margin + col * self.cell_size
@@ -98,6 +107,34 @@ class GoBoard:
             x0, y0 = x - self.cell_size / 2, y
             x1, y1 = x + self.cell_size / 2, y
             self.canvas.create_line(x0, y0, x1, y1)
+
+    def pass_turn(self):
+        if self.last_player_passed:  # 2 passes in a row ends the game
+            self.passed_twice = True
+            print("Both players passed. Game over!")
+            self.calculate_score()  # score calc
+        else:
+            self.last_player_passed = True
+            self.current_color = "white" if self.current_color == "black" else "black"
+            print(f"{self.current_color}'s turn to play.")
+
+    def calculate_score(self):  # Chinese rules
+        black_score = len([stone for stone in self.logic.stones.values() if stone == "black"])
+        white_score = len([stone for stone in self.logic.stones.values() if stone == "white"])
+
+        # Flood fill
+        black_territory, white_territory = self.logic.calculate_territory()
+
+        black_score += black_territory
+        white_score += white_territory
+
+        print(f"Final Score - Black: {black_score}, White: {white_score}")
+        if black_score > white_score:
+            print("Black wins!")
+        elif white_score > black_score:
+            print("White wins!")
+        else:
+            print("It's a tie!")
 
 
 if __name__ == "__main__":
