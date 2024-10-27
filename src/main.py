@@ -1,9 +1,10 @@
 import tkinter as tk
 from game_logic import GameLogic
+from src.AlphaZero.mcts import MCTS
 
 
 class GoBoard:
-    def __init__(self, window, canvas_size=500, size=19, margin=30):
+    def __init__(self, window, model, canvas_size=500, size=19, margin=30):
         self.window = window
         self.canvas_size = canvas_size
         self.size = size
@@ -14,13 +15,24 @@ class GoBoard:
         self.logic = GameLogic(size)
         self.current_color = "black"  # black always starts
         self.bg_color = "#e0c69d"  # board color
+        self.model = model
+        self.mcts = MCTS(self.model, self.logic, num_simulations=800)
+        self.ai_mode = False
+
+        # Load model weights for AI
+        self.model.load_weights("alphazero_model.weights.h5")
+
         self.create_board()
-        self.last_player_passed = False
-        self.passed_twice = False
         self.pass_button = tk.Button(window, text="Pass", command=self.pass_turn)
         self.pass_button.pack()
+        self.ai_toggle_button = tk.Button(window, text="Toggle AI Mode", command=self.toggle_ai_mode)
+        self.ai_toggle_button.pack()
 
         self.canvas.bind("<Button-1>", self.place_stone)  # left click
+
+    def toggle_ai_mode(self):
+        self.ai_mode = not self.ai_mode
+        print(f"AI Mode is now {'enabled' if self.ai_mode else 'disabled'}.")
 
     def create_board(self):
         self.canvas.create_rectangle(0, 0, self.canvas_size, self.canvas_size, fill=self.bg_color,
@@ -61,7 +73,7 @@ class GoBoard:
             self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill="black")
 
     def place_stone(self, event):
-        if self.passed_twice:
+        if self.logic.is_game_over():
             print("Game already over!")
             return
 
@@ -74,8 +86,27 @@ class GoBoard:
                 captured_stones = self.logic.check_captures(row, col, self.current_color)
                 if captured_stones:
                     self.remove_captured_stones(captured_stones)
+
+                # Switch to the next player
                 self.current_color = "white" if self.current_color == "black" else "black"
                 self.last_player_passed = False
+
+                if self.ai_mode:
+                    self.ai_move()
+
+    def ai_move(self):
+        print("AI is thinking...")
+        state = self.logic.get_current_state()
+        self.mcts.run_mcts(state, 1 if self.current_color == "black" else -1)
+        action = self.mcts.select_action(state, temperature=0.1)  # Greedy move selection
+
+        if action is None:
+            print("AI passed.")
+            self.pass_turn()
+        else:
+            row, col = action
+            self.add_stone(row, col)
+            self.current_color = "white" if self.current_color == "black" else "black"
 
     def add_stone(self, row, col):
         x = self.margin + col * self.cell_size
